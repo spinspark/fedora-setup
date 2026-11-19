@@ -1,0 +1,86 @@
+---
+- name: Setup Fedora Workstation
+  hosts: localhost
+  become: true
+
+  tasks:
+    - name: Configure DNF parallel downloads
+      become: true
+      community.general.ini_file:
+        path: /etc/dnf/dnf.conf
+        section: main
+        option: max_parallel_downloads
+        value: "10"
+        no_extra_spaces: true
+        mode: "0644"
+
+    - name: Update all installed packages
+      become: true
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+        update_cache: true
+
+    - name: Enable RPM Fusion Free & Nonfree reposotories
+      ansible.builtin.dnf:
+        name:
+          - "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-{{ ansible_distribution_major_version }}.noarch.rpm"
+          - "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-{{ ansible_distribution_major_version }}.noarch.rpm"
+        state: present
+        disable_gpg_check: true
+
+    - name: Enable Flathub repository
+      become: true
+      community.general.flatpak_remote:
+        name: flathub
+        state: present
+        enabled: true
+        flatpakrepo_url: https://dl.flathub.org/repo/flathub.flatpakrepo
+
+    - name: Swap ffmpeg-free for full ffmpeg
+      become: true
+      ansible.builtin.dnf:
+        name: ffmpeg
+        state: present
+        allowerasing: true
+
+    - name: Install multimedia codec packages
+      become: true
+      ansible.builtin.dnf:
+        name: "@multimedia"
+        state: present
+        install_weak_deps: false
+        exclude:
+          - PackageKit-gstreamer-plugin
+
+    - name: Detect graphics controllers
+      ansible.builtin.command: lspci -d ::0300 -d ::0302 -d ::0380
+      register: gpu_info
+      changed_when: false
+
+    - name: Install AMD hardware video acceleration
+      become: true
+      ansible.builtin.dnf:
+        name: mesa-va-drivers-freeworld
+        state: present
+      when: gpu_info.stdout is search('AMD|ATI')
+
+    - name: Install Intel hardware video acceleration
+      become: true
+      ansible.builtin.dnf:
+        name: intel-media-driver
+        state: present
+      when: gpu_info.stdout is search('Intel')
+
+    - name: Check if reboot is required
+      become: true
+      ansible.builtin.command: dnf needs-restarting -r
+      register: reboot_check
+      changed_when: false
+      failed_when: reboot_check.rc not in [0, 1]
+
+    - name: Reboot to apply kernel and driver updates
+      become: true
+      ansible.builtin.reboot:
+      when: reboot_check.rc == 1
+

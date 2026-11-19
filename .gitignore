@@ -1,0 +1,13 @@
+# Ansible retry files
+*.retry
+
+# Python cache (created when Ansible runs local modules)
+__pycache__/
+*.py[cod]
+
+# Editor & OS junk
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
