@@ -29,6 +29,12 @@
         state: present
         disable_gpg_check: true
 
+    - name: Add Tailscale repository
+      ansible.builtin.get_url:
+        url: https://pkgs.tailscale.com/stable/fedora/tailscale.repo
+        dest: /etc/yum.repos.d/tailscale.repo
+        mode: "0644"
+
     - name: Enable Flathub repository
       become: true
       community.general.flatpak_remote:
@@ -52,6 +58,11 @@
         install_weak_deps: false
         exclude:
           - PackageKit-gstreamer-plugin
+
+    - name: Install Tailscale
+      ansible.builtin.dnf:
+        name: tailscale
+        state: present
 
     - name: Detect graphics controllers
       ansible.builtin.command: lspci -d ::0300 -d ::0302 -d ::0380
